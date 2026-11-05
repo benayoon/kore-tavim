@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>קורא תווים</title>
+  <meta name="description" content="אימון קריאה מהדף: גבהים, קצב ואקורדים בכל מפתח ובכל רמה">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="קורא תווים">
+  <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%235AA9FF'/%3E%3Cstop offset='1' stop-color='%230048C8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Ctext x='32' y='49' font-size='44' text-anchor='middle' fill='white'%3E%F0%9D%84%9E%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="vendor/vexflow.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="nav-rail">
+      <div class="brand"><span class="app-icon" aria-hidden="true">𝄞</span><b>קורא תווים</b></div>
+      <nav id="tabs" class="nav-list" aria-label="ניווט ראשי">
+        <button type="button" data-mode="path" class="nav-item"><span class="sq" data-sq="path" data-glyph="path"></span><span>האימון שלי</span></button>
+        <div class="nav-title">תרגול חופשי</div>
+        <button type="button" data-mode="sight" class="nav-item"><span class="sq" data-sq="sight" data-glyph="sight"></span><span>קריאה מהדף</span></button>
+        <button type="button" data-mode="quiz" class="nav-item"><span class="sq" data-sq="quiz" data-glyph="quiz"></span><span>זיהוי תווים</span></button>
+        <button type="button" data-mode="rhythm" class="nav-item"><span class="sq" data-sq="rhythm" data-glyph="rhythm"></span><span>קצב</span></button>
+        <button type="button" data-mode="chords" class="nav-item"><span class="sq" data-sq="chords" data-glyph="chords"></span><span>אקורדים</span></button>
+        <div class="nav-title">התקדמות</div>
+        <button type="button" data-mode="progress" class="nav-item"><span class="sq" data-sq="progress" data-glyph="progress"></span><span>הפרופיל שלי</span></button>
+      </nav>
+      <div class="nav-foot">
+        <button type="button" id="player-chip" class="player-chip" title="החלפת נגן"></button>
+        <div class="nav-tools">
+          <span id="midi-status" class="pill">MIDI…</span>
+          <button type="button" id="btn-piano" class="icon-btn" title="הצגה או הסתרה של המקלדת" aria-label="מקלדת">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8.5 5v14M15.5 5v14M12 5v14"/></svg>
+          </button>
+          <button type="button" id="btn-prefs" class="icon-btn" title="העדפות" aria-label="העדפות">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 7h9M18 7h1M5 12h1M10 12h9M5 17h7M16 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main id="views">
+      <div id="compact-title" class="compact-title" aria-hidden="true"></div>
+      <div id="practice-seg" class="practice-seg seg-control" role="group" aria-label="סוג תרגול" hidden>
+        <i class="seg-thumb" style="--n:4;--i:0"></i>
+        <button type="button" data-mode="sight">קריאה</button><button type="button" data-mode="quiz">תווים</button><button type="button" data-mode="rhythm">קצב</button><button type="button" data-mode="chords">אקורדים</button>
+      </div>
+      <section class="view" id="view-path"></section>
+      <section class="view" id="view-sight"></section>
+      <section class="view" id="view-quiz"></section>
+      <section class="view" id="view-rhythm"></section>
+      <section class="view" id="view-chords"></section>
+      <section class="view" id="view-progress"></section>
+    </main>
+  </div>
+
+  <nav class="tab-bar" aria-label="ניווט ראשי">
+    <i class="tab-thumb" aria-hidden="true"></i>
+    <button type="button" data-mode="path" class="tab-item"><span data-glyph="path"></span><span>אימון</span></button>
+    <button type="button" data-practice class="tab-item"><span data-glyph="practice"></span><span>תרגול</span></button>
+    <button type="button" data-mode="progress" class="tab-item"><span data-glyph="progress"></span><span>פרופיל</span></button>
+  </nav>
+
+  <div id="piano-dock" class="piano-dock">
+    <div class="piano-bar"><span class="hint">קלידים: לחיצה, או מקשי A–L במחשב (W E T Y U לשחורים) · Z / X להחלפת אוקטבה</span><span id="kb-oct" class="kb-oct"></span></div>
+    <div class="piano-scroll"><div id="piano" class="piano"></div></div>
+  </div>
+
+  <dialog id="players-dlg" class="sheet">
+    <form method="dialog" class="prefs">
+      <div class="sheet-head"><h2>נגנים</h2><button class="nav-done">סיום</button></div>
+      <div class="players-body"></div>
+    </form>
+  </dialog>
+
+  <div id="wizard-overlay" class="wizard-overlay" hidden></div>
+
+  <dialog id="prefs-dlg" class="sheet">
+    <form method="dialog" class="prefs">
+      <div class="sheet-head"><h2>העדפות</h2><button class="nav-done">סיום</button></div>
+      <div class="form-group">
+        <label class="field row"><span class="flabel">מראה</span>
+          <select id="pref-theme"><option value="auto">אוטומטי</option><option value="light">בהיר</option><option value="dark">כהה</option></select>
+        </label>
+        <label class="field row"><span class="flabel">שמות התווים</span>
+          <select id="pref-naming"><option value="solfege">דו רה מי</option><option value="letters">C D E</option></select>
+        </label>
+        <label class="field"><span class="flabel">עוצמת שמע</span><input type="range" id="pref-volume" min="0" max="1" step="0.05"></label>
+        <label class="field toggle"><span>צליל גם בנגינה ב־MIDI</span><input type="checkbox" id="pref-midisound"><span class="switch"></span></label>
+        <label class="field row"><span class="flabel">כיול השהיה (מילישניות)</span><input type="number" id="pref-latency" min="-300" max="300" step="5"></label>
+      </div>
+      <p class="help footnote">אם הנגינה נמדדת שוב ושוב כ"מאחרת", הגדילו את הכיול. אם היא נמדדת כ"מקדימה", הקטינו אותו.</p>
+    </form>
+  </dialog>
+
+  <div id="mic-live" class="mic-live" hidden aria-live="off">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    <span class="mic-level"><i></i></span><b class="mic-note"></b>
+  </div>
+  <div id="beat-pulse" class="beat-pulse" hidden aria-hidden="true"></div>
+
+  <div id="toast"></div>
+
+  <script src="js/theory.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/analysis.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/mic.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/curriculum.js"></script>
+  <script src="js/modes/sight.js"></script>
+  <script src="js/modes/quiz.js"></script>
+  <script src="js/modes/rhythm.js"></script>
+  <script src="js/modes/chords.js"></script>
+  <script src="js/modes/progress.js"></script>
+  <script src="js/modes/path.js"></script>
+  <script src="js/modes/profiles.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

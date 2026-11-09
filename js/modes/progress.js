@@ -75,6 +75,8 @@ const ProgressMode = (() => {
     }
     return out;
   }
+  // הזמן בגרפים זורם משמאל לימין, גם בממשק בעברית. הכיתוב מבהיר את זה.
+  const timeAxis = (old, now) => h('div', { class: 'time-axis' }, h('span', {}, old), h('span', {}, now));
   let trendId = 0;
   function trendChart(title, cats) {
     const data = weeks(cats);
@@ -103,7 +105,7 @@ const ProgressMode = (() => {
       const hit = add('circle', { cx: X(i), cy: Y(d.v), r: 14, fill: 'transparent' });
       hover(hit, `${d.label}: ${UI.pct(d.v)} (${d.a} ניסיונות)`);
     });
-    return h('div', { class: 'trend' }, h('div', { class: 'trend-head' }, h('b', {}, title), h('span', {}, last ? UI.pct(last.v) : '–')), svg);
+    return h('div', { class: 'trend' }, h('div', { class: 'trend-head' }, h('b', {}, title), h('span', {}, last ? `${UI.pct(last.v)} נכון` : 'אין נתונים')), svg, timeAxis('לפני 8 שבועות', 'השבוע'));
   }
 
   // ---- מפת תווים ----
@@ -124,11 +126,14 @@ const ProgressMode = (() => {
       for (let s = lo; s <= hi; s++) {
         const r = by.get(s), m = STATUS[Store.mastery(r)];
         const name = Theory.pitchName({ step: s, alter: 0 }, App.prefs.naming, true);
-        const el = h('div', { class: 'note-tile ' + m.cls }, h('b', {}, name), h('small', {}, r && r.a ? UI.pct(r.c / r.a) : '–'), h('i', {}, m.label));
+        const el = h('div', { class: 'note-tile ' + m.cls }, h('b', {}, name), h('small', {}, r && r.a ? `${UI.pct(r.c / r.a)} נכון` : 'עוד לא תורגל'), r && r.a ? h('small', {}, `${r.a} ניסיונות`) : null, h('i', {}, m.label));
         hover(el, r && r.a ? `${name}: ${r.c}/${r.a} נכון · ${(r.rt / 1000 || 0).toFixed(1)} שנ׳ לתו` : `${name}: עוד לא תורגל`);
         tiles.push(el);
       }
-      return h('div', {}, h('h4', {}, `מפתח ${CLEF_NAMES[c]}`), h('div', { class: 'note-map' }, tiles));
+      const counts = {};
+      for (let s = lo; s <= hi; s++) { const k = Store.mastery(by.get(s)); counts[k] = (counts[k] || 0) + 1; }
+      const parts = ['mastered', 'solid', 'learning', 'weak', 'new'].filter(k => counts[k]).map(k => `${counts[k]} ${STATUS[k].label}`);
+      return h('div', {}, h('h4', {}, `מפתח ${CLEF_NAMES[c]}: ${hi - lo + 1} תווים`), h('p', { class: 'map-summary' }, parts.join(' · ')), h('div', { class: 'note-map' }, tiles));
     });
   }
 
@@ -144,7 +149,7 @@ const ProgressMode = (() => {
       return h('div', { class: 'rhythm-card ' + m.cls }, staff,
         h('b', {}, Cells.label(id)),
         h('div', { class: 'meter' }, h('i', { style: `width:${r.a ? r.c / r.a * 100 : 0}%` })),
-        h('small', {}, `${UI.pct(r.a ? r.c / r.a : 0)} מתוך ${r.a}${dev != null && Math.abs(dev) >= 15 ? ` · ${Math.abs(dev)}ms ${dev > 0 ? 'מאחרים' : 'מקדימים'}` : ''}`),
+        h('small', {}, `${r.c} נכונים מתוך ${r.a} ניסיונות (${UI.pct(r.a ? r.c / r.a : 0)})${dev != null && Math.abs(dev) >= 15 ? ` · ${Math.abs(dev)}ms ${dev > 0 ? 'מאחרים' : 'מקדימים'}` : ''}`),
         h('i', { class: 'status-chip' }, m.label));
     });
     return [h('div', { class: 'rhythm-grid' }, cards)];
@@ -185,22 +190,24 @@ const ProgressMode = (() => {
     for (let i = 27; i >= 0; i--) days.push([Store.today(i), stats.daily[Store.today(i)] || 0]);
     const max = Math.max(1, ...days.map(d => d[1]));
     root.append(section('פעילות ב־28 הימים האחרונים', h('div', { class: 'bars' }, days.map(([d, n]) =>
-      hover(h('div', { class: 'bar-col' }, h('div', { class: 'bar' + (n ? '' : ' zero'), style: `height:${Math.max(3, n / max * 100)}%` })), `${d.split('-').reverse().join('.')}: ${n} ניסיונות`)))));
+      hover(h('div', { class: 'bar-col' }, h('div', { class: 'bar' + (n ? '' : ' zero'), style: `height:${Math.max(3, n / max * 100)}%` })), `${d.split('-').reverse().join('.')}: ${n} ניסיונות`))), timeAxis('לפני 4 שבועות', 'היום')));
 
-    root.append(section('מפת התווים', ...noteMap()));
-    root.append(section('מקצבים, מהחלש לחזק', ...rhythmGrid()));
+    const statusKey = h('div', { class: 'status-key' }, [['weak', 'פחות מ־60% לאחרונה'], ['learning', 'בתהליך'], ['solid', 'החזיק לפחות יום אחד'], ['mastered', 'החזיק לאורך כמה ימים'], ['new', 'פחות מ־3 ניסיונות']]
+      .map(([k, d]) => h('span', { class: STATUS[k].cls }, h('i', {}, STATUS[k].label), ` ${d}`)));
+    root.append(section('מפת התווים', h('p', { class: 'section-help' }, 'כל משבצת היא תו. האחוז הוא כמה פעמים קראתם אותו נכון. התווים מסודרים כמו בפסנתר: הנמוך משמאל, הגבוה מימין.'), statusKey, ...noteMap()));
+    root.append(section('מקצבים, מהחלש לחזק', h('p', { class: 'section-help' }, 'רק מקצבים שכבר תרגלתם. ניסיון הוא כל פעם שהמקצב הופיע בתרגיל.'), ...rhythmGrid()));
 
     const keyList = Object.entries(it.keys);
     if (keyList.length) {
       root.append(section('סימני היתק', h('div', { class: 'note-map' }, keyList.sort((a, b) => +a[0] - +b[0]).map(([f, r]) => {
         const m = STATUS[Store.mastery(r)];
-        return h('div', { class: 'note-tile ' + m.cls }, h('b', {}, Theory.keyShort(+f, App.prefs.naming)), h('small', {}, UI.pct(r.c / r.a)), h('i', {}, m.label));
+        return h('div', { class: 'note-tile ' + m.cls }, h('b', {}, Theory.keyShort(+f, App.prefs.naming)), h('small', {}, `${UI.pct(r.c / r.a)} נכון`), h('small', {}, `${r.a} ניסיונות`), h('i', {}, m.label));
       }))));
     }
     const ch = Object.entries(it.chords);
     if (ch.length) {
       root.append(section('אקורדים', h('div', { class: 'mode-rows' }, ch.map(([q, r]) => h('div', { class: 'mode-row' },
-        h('span', {}, Theory.QUALITIES[q] ? Theory.QUALITIES[q].name : q), h('div', { class: 'meter' }, h('i', { style: `width:${r.c / r.a * 100}%` })), h('b', {}, `${UI.pct(r.c / r.a)} (${r.a})`))))));
+        h('span', {}, Theory.QUALITIES[q] ? Theory.QUALITIES[q].name : q), h('div', { class: 'meter' }, h('i', { style: `width:${r.c / r.a * 100}%` })), h('b', {}, `${r.c} מתוך ${r.a} נכון`))))));
     }
 
     const last = stats.history.slice(-12).reverse();

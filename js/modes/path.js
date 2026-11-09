@@ -34,9 +34,11 @@ const PathMode = (() => {
       el: () => UI.rings([UI.ringOf('notes', n('notes') / g.notes), UI.ringOf('rhythm', n('rhythms') / g.rhythm), UI.ringOf('read', n('read') / g.read)], size, stroke) };
   }
   function ringLegend(r) {
-    const row = (cls, label, v, goal) => h('div', { class: 'legend-row ' + cls }, h('small', {}, label), h('b', {}, `${v}`, h('span', {}, ` מתוך ${goal}`)));
+    // ברור מה נספר: כמה עשיתם היום, ומה היעד
+    const row = (cls, label, v, goal) => h('div', { class: 'legend-row ' + cls }, h('small', {}, label), h('b', {}, String(v)),
+      h('span', { class: 'legend-goal' }, v >= goal ? `✓ היעד של ${goal} הושג` : `היעד להיום: ${goal}`));
     return h('div', { class: 'ring-legend' },
-      row('c-notes', 'תווים', r.vals.notes, r.goal.notes), row('c-rhythm', 'קצב', r.vals.rhythm, r.goal.rhythm), row('c-read', 'קטעי קריאה', r.vals.read, r.goal.read));
+      row('c-notes', 'תווים שזיהיתם היום', r.vals.notes, r.goal.notes), row('c-rhythm', 'מקצבים שתרגלתם היום', r.vals.rhythm, r.goal.rhythm), row('c-read', 'קטעים שקראתם היום', r.vals.read, r.goal.read));
   }
   function weekStrip() {
     const names = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
@@ -93,23 +95,25 @@ const PathMode = (() => {
     inst.clefs.forEach(c => {
       const r = Curriculum.rangeAt(c, st.pitch[c]);
       const next = Curriculum.rangeAt(c, st.pitch[c] + 1).added;
-      cards.push(track('quiz', `מפתח ${Curriculum.CLEF_NAMES[c]}`, `${r.hi - r.lo + 1} תווים`, `${Theory.stepLabel(r.lo, naming())} עד ${Theory.stepLabel(r.hi, naming())}`,
-        next != null && st.pitch[c] < Curriculum.maxPitchStage(c) ? `הבא: ${Theory.stepLabel(next, naming())}` : 'כל התווים נפתחו', `pitch:${c}`));
+      cards.push(track('quiz', `מפתח ${Curriculum.CLEF_NAMES[c]}`, `פתוחים ${r.hi - r.lo + 1} מתוך ${Curriculum.totalNotes(c)} תווים`, `מ־${Theory.stepLabel(r.lo, naming())} עד ${Theory.stepLabel(r.hi, naming())}`,
+        next != null && st.pitch[c] < Curriculum.maxPitchStage(c) ? `התו הבא: ${Theory.stepLabel(next, naming())}` : 'כל התווים נפתחו', `pitch:${c}`));
     });
     const nextR = Curriculum.RHYTHM_STAGES[st.rhythm + 1];
-    cards.push(track('rhythm', 'קצב', `${Curriculum.cellsAt(st).length} מקצבים`, `טמפו ${st.rtempo}`, nextR ? `הבא: ${Cells.label(nextR.cells[0])}` : 'כל המקצבים נפתחו', 'rhythm'));
+    cards.push(track('rhythm', 'קצב', `פתוחים ${Curriculum.cellsAt(st).length} מתוך ${Curriculum.totalCells()} מקצבים`, `טמפו ${st.rtempo}`, nextR ? `המקצב הבא: ${Cells.label(nextR.cells[0])}` : 'כל המקצבים נפתחו', 'rhythm'));
     const ks = Curriculum.keysAt(st);
     const nextK = Curriculum.KEY_ORDER[st.keys + 1];
-    cards.push(track('keys', 'סולמות', `${ks.length} סולמות`, null, nextK != null ? `הבא: ${Theory.keyName(nextK, 'major', naming())}` : 'כל הסולמות נפתחו', 'keys'));
+    cards.push(track('keys', 'סולמות', `פתוחים ${ks.length} מתוך ${Curriculum.KEY_ORDER.length} סולמות`, null, nextK != null ? `הסולם הבא: ${Theory.keyName(nextK, 'major', naming())}` : 'כל הסולמות נפתחו', 'keys'));
     cards.push(track('sight', 'קריאה', `טמפו ${st.tempo}`, inst.grand ? Curriculum.TEXTURES[st.texture].name : null, 'טמפו עולה כשהקריאה נקייה', null));
     return cards;
   }
   function track(glyph, title, big, now, next, tr) {
     const a = tr ? Curriculum.acc(st, tr) : null;
+    const fill = tr ? Math.round(Math.min(100, (a == null ? 0 : a) / Curriculum.TARGET * 100 * ((st.recent[tr] || []).length / Curriculum.WINDOW))) : 0;
     return h('div', { class: 'track' },
       h('div', { class: 'track-head' }, UI.sq(glyph), h('span', {}, title)),
       h('b', {}, big), now ? h('span', {}, now) : null, h('small', {}, next),
-      tr ? h('div', { class: 'meter', title: 'התקדמות לפריט הבא' }, h('i', { style: `width:${Math.min(100, (a == null ? 0 : a) / Curriculum.TARGET * 100 * ((st.recent[tr] || []).length / Curriculum.WINDOW))}%` })) : null);
+      tr ? h('div', { class: 'meter', 'aria-hidden': 'true' }, h('i', { style: `width:${fill}%` })) : null,
+      tr ? h('small', { class: 'meter-cap' }, `הדרך לפריט הבא: ${fill}%`) : null);
   }
 
   function researchBox() {
@@ -583,11 +587,15 @@ const PathMode = (() => {
       h('span', { class: 'tag' }, `טמפו ${st.tempo}`));
     const tip = Gen.pick(TIPS);
     const bar = h('div', { class: 'timer' }, h('i'));
+    // מסתירה תווים בכוונה, ולכן רק בבחירה מפורשת ובנגינה בזמן אמת
+    const lookInp = h('input', { type: 'checkbox', checked: !!st.lookAhead, onchange: () => { st.lookAhead = lookInp.checked; Curriculum.save(st); } });
+    const realTime = mode === 'midi' || mode === 'acoustic' || (mode === 'mic' && Math.min(...inst.clefs.map(c => st.pitch[c])) >= 4);
+    const lookRow = realTime ? h('label', { class: 'field toggle look-row' }, h('span', {}, h('b', {}, 'קריאה קדימה'), h('small', {}, 'אתגר: התווים נעלמים רגע לפני שמנגנים אותם.')), lookInp, h('span', { class: 'switch' })) : null;
     const startRead = UI.btn(mode === 'keys' ? 'מתחילים' : 'מתחילים לנגן', () => begin(), 'primary big', 'play');
     sh.below.append(h('div', { class: 'intro-card' },
       h('h3', {}, 'סריקה לפני שמתחילים'),
       h('p', {}, 'בדקו את הסולם, המשקל והתיבה המסומנת. נסו לשמוע את הפתיחה בראש.'),
-      h('p', { class: 'tip-line' }, tip), bar, startRead));
+      h('p', { class: 'tip-line' }, tip), lookRow, bar, startRead));
     const lim = (8 + barsN) * 1000, t0 = performance.now();
     const tick = () => {
       const f = (performance.now() - t0) / lim;
@@ -626,10 +634,10 @@ const PathMode = (() => {
       const rec = [];
       if (mode === 'mic') Mic.start();
       on.input = e => { if (e.type === 'on') rec.push({ m: e.midi, t: e.time, used: false, src: e.src }); };
-      sh.below.append(h('p', { class: 'tip' }, st.mask ? 'קריאה קדימה פעילה: התווים נעלמים רגע לפני שמנגנים אותם.' : 'נגנו עם הסמן. טעיתם? ממשיכים.'));
+      sh.below.append(h('p', { class: 'tip' }, st.lookAhead ? 'קריאה קדימה פעילה: התווים נעלמים רגע לפני שמנגנים אותם.' : 'נגנו עם הסמן. טעיתם? ממשיכים.'));
       Player.start(piece, layout, {
         tempo: st.tempo, metronome: true, mute: true, tail: 0.6,
-        onOnset: i => { UI.placeCursor(sh, layout, i, 'play'); if (st.mask) UI.readingMask(sh, layout, i, 2 * piece.ti.group); },
+        onOnset: i => { UI.placeCursor(sh, layout, i, 'play'); if (st.lookAhead) UI.readingMask(sh, layout, i, 2 * piece.ti.group); },
         onCount: c => UI.countIn(sh, c),
         onEnd: () => {
           on.input = null;
@@ -687,7 +695,7 @@ const PathMode = (() => {
     function acoustic() {
       Player.start(piece, layout, {
         tempo: st.tempo, metronome: true, mute: true, tail: 0.3,
-        onOnset: i => { UI.placeCursor(sh, layout, i, 'play'); if (st.mask) UI.readingMask(sh, layout, i, 2 * piece.ti.group); },
+        onOnset: i => { UI.placeCursor(sh, layout, i, 'play'); if (st.lookAhead) UI.readingMask(sh, layout, i, 2 * piece.ti.group); },
         onCount: c => UI.countIn(sh, c),
         onEnd: () => {
           sh.cursor.hidden = true; UI.clearMask(sh);

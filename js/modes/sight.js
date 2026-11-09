@@ -57,7 +57,7 @@ const SightMode = (() => {
       { section: 'בזמן התרגול' },
       { label: 'מטרונום', checked: () => s.metronome, act: () => { s.metronome = !s.metronome; save(); } },
       { label: 'רמז במקלדת', checked: () => s.hint, act: () => { s.hint = !s.hint; save(); if (waitSt) focusWait(); } },
-      { label: 'קריאה קדימה', checked: () => s.lookAhead, act: () => { s.lookAhead = !s.lookAhead; save(); } },
+      { label: 'קריאה קדימה (מסתיר תווים בביצוע)', checked: () => s.lookAhead, act: () => { s.lookAhead = !s.lookAhead; save(); } },
       { label: 'סימון התיבה הקשה', checked: () => s.markHard, act: () => { s.markHard = !s.markHard; save(); showHard(); } },
       { section: 'בהאזנה להשמיע' },
       ...[['both', 'שתי הידיים'], ['right', 'יד ימין'], ['left', 'יד שמאל']].map(([v, l]) => (
@@ -228,7 +228,7 @@ const SightMode = (() => {
       onCount: n => UI.countIn(sh, n),
       onEnd: finishPerform,
     });
-    setStatus('נגנו יחד עם הסמן והמטרונום');
+    setStatus(s.lookAhead ? 'קריאה קדימה פעילה: התווים נעלמים רגע לפני שמנגנים אותם' : 'נגנו יחד עם הסמן והמטרונום');
     setButtons();
   }
   function finishPerform() {

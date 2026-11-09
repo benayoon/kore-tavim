@@ -985,3 +985,23 @@ button, .name-btn, .q-btn, .tap-pad, .chip, .wk, .bk { touch-action: manipulatio
   /* מתחת ל־16 נקודות, אייפון מגדיל את המסך כשנכנסים לשדה */
   select, input[type=number], .text-input { font-size: 16px; }
 }
+
+/* ---- בהירות המספרים והכיוון ---- */
+.look-row { width: 100%; padding: var(--s2) 0; min-height: 44px; }
+.look-row small { display: block; color: var(--muted); font-size: var(--t-footnote); font-weight: 400; }
+.look-row b { font-weight: 600; }
+.legend-row small { font-size: var(--t-footnote); }
+.legend-goal { display: block; font-size: var(--t-footnote); color: var(--muted); font-weight: 500; }
+.week { direction: ltr; }
+.track > b { font-size: 19px; letter-spacing: -0.02em; line-height: 1.2; }
+.meter-cap { margin-top: 4px; font-size: var(--t-caption) !important; }
+.time-axis { display: flex; justify-content: space-between; direction: ltr; margin-top: var(--s1); font-size: var(--t-caption); color: var(--muted); }
+.section-help { color: var(--muted); font-size: var(--t-subhead); margin: calc(var(--s1) * -1) 0 var(--s3); }
+.status-key { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font-size: var(--t-caption); color: var(--muted); margin-bottom: var(--s2); background: none; }
+.status-key span { background: none; padding: 0; }
+.status-key i { font-style: normal; font-weight: 700; }
+.status-key .s-weak i { color: var(--bad); } .status-key .s-learning i { color: var(--warn); } .status-key .s-solid i, .status-key .s-mastered i { color: var(--ok); }
+.map-summary { color: var(--muted); font-size: var(--t-footnote); margin-bottom: var(--s2); }
+.note-tile { width: 88px; }
+.mode-row { grid-template-columns: 120px 1fr 110px; }
+@media (max-width: 760px) { .mode-row { grid-template-columns: 90px 1fr 100px; } .finish-hero .ring-legend { flex-wrap: wrap; justify-content: center; } }

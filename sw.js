@@ -1,6 +1,6 @@
 'use strict';
 /* נוצר אוטומטית על ידי tools/build.py. לא לערוך את הקובץ שב־dist. */
-const CACHE = 'kore-tavim-a4d44d157f77';
+const CACHE = 'kore-tavim-f0ae585759e9';
 const ASSETS = [
   "./",
   "css/styles.css",

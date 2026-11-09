@@ -103,7 +103,12 @@ const PathMode = (() => {
     const ks = Curriculum.keysAt(st);
     const nextK = Curriculum.KEY_ORDER[st.keys + 1];
     cards.push(track('keys', 'סולמות', `פתוחים ${ks.length} מתוך ${Curriculum.KEY_ORDER.length} סולמות`, null, nextK != null ? `הסולם הבא: ${Theory.keyName(nextK, 'major', naming())}` : 'כל הסולמות נפתחו', 'keys'));
-    cards.push(track('sight', 'קריאה', `טמפו ${st.tempo}`, inst.grand ? Curriculum.TEXTURES[st.texture].name : null, 'טמפו עולה כשהקריאה נקייה', null));
+    const back = st.readBack || 0;
+    const sc = Curriculum.readScope(st, inst), c0 = inst.clefs[0];
+    const size = stage => { const r = Curriculum.rangeAt(c0, stage); return r.hi - r.lo + 1; };
+    const scopeTxt = back ? `בקריאה עכשיו: ${size(sc.pitch[c0])} מתוך ${size(st.pitch[c0])} התווים הפתוחים` : 'בקריאה: כל החומר שפתחתם';
+    cards.push(track('sight', 'קריאה', `טמפו ${st.tempo}`, inst.grand ? `${scopeTxt} · ${Curriculum.TEXTURES[sc.texture].name}` : scopeTxt,
+      back ? 'קריאה נקייה מחזירה תווים ומקצבים, באותו טמפו' : 'כשקשה, מצמצמים תווים ומקצבים ולא מאטים', null));
     return cards;
   }
   function track(glyph, title, big, now, next, tr) {
@@ -584,7 +589,8 @@ const PathMode = (() => {
       Curriculum.soundingText(Store.active(), piece.key.fifths, piece.key.mode, naming()) ? h('span', { class: 'tag' }, Curriculum.soundingText(Store.active(), piece.key.fifths, piece.key.mode, naming())) : null,
       h('span', { class: 'tag' }, `משקל ${piece.time.num}/${piece.time.den}`),
       h('span', { class: 'tag' }, `הערך הקצר: ${shortLabel}`),
-      h('span', { class: 'tag' }, `טמפו ${st.tempo}`));
+      h('span', { class: 'tag' }, `טמפו ${st.tempo}`),
+      st.readBack ? h('span', { class: 'tag' }, 'חומר מצומצם') : null);
     const tip = Gen.pick(TIPS);
     const bar = h('div', { class: 'timer' }, h('i'));
     // מסתירה תווים בכוונה, ולכן רק בבחירה מפורשת ובנגינה בזמן אמת
@@ -622,6 +628,7 @@ const PathMode = (() => {
       Mic.stop();
       const ups = Curriculum.afterRead(st, score, readInst);
       ups.forEach(u => { session.unlocked.push(u); UI.toast(u.text, 'ok'); });
+      if (ups.change) note = note ? `${note} ${ups.change.text}` : ups.change.text;
       Curriculum.save(st);
       App.dock(false);
       UI.resultCard(sh, {

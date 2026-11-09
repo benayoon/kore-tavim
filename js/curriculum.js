@@ -151,7 +151,18 @@ const Curriculum = (() => {
       tempo: sp.tempo, rtempo: sp.tempo, recent: {}, readStreak: 0, mask: false, unlocked: [], lastHand: 'L', sessions: 0,
     };
   }
-  const load = profile => Store.load('progress', fresh(profile));
+  // קריאה מהדף: שומרים על טמפו נורמלי, ומצמצמים את החומר כשקשה
+  const TEMPO_FLOOR = 60, TEMPO_MIN = 48, BACK_MAX = 6;
+  function load(profile) {
+    const st = Store.load('progress', fresh(profile));
+    if (st.readBack == null) {
+      // גרסה קודמת הורידה רק את הטמפו: מחזירים לטמפו נורמלי ומצמצמים את החומר במקום
+      st.readBack = st.tempo < TEMPO_FLOOR ? Math.min(BACK_MAX, Math.ceil((TEMPO_FLOOR - st.tempo) / 6)) : 0;
+      st.tempo = Math.max(TEMPO_FLOOR, st.tempo);
+      st.readFails = 0;
+    }
+    return st;
+  }
   const save = st => Store.save('progress', st);
 
   const cellsAt = st => RHYTHM_STAGES.slice(0, st.rhythm + 1).flatMap(s => s.cells);
@@ -220,46 +231,89 @@ const Curriculum = (() => {
     return msg;
   }
 
-  // אחרי קטע קריאה: טמפו ומרקם
+  // אחרי קטע קריאה. העיקרון: לקרוא בקצב נורמלי, ולהוסיף חומר לאט לאט.
+  // קשה? מצמצמים קודם מנעד, מקצבים ומרקם, ורק בצמצום המרבי מאטים קצת.
+  // הולך טוב? מחזירים חומר צעד אחרי צעד, וטמפו עולה רק כשכל החומר הפתוח בפנים.
   function afterRead(st, score, inst) {
     const out = [];
-    if (score >= 0.9) st.tempo = Math.min(160, st.tempo + 4);
-    if (score < 0.6) st.tempo = Math.max(40, st.tempo - 6);
-    if (score >= 0.85) {
-      st.readStreak++;
-      const enough = Math.min(...inst.clefs.map(c => st.pitch[c])) >= 4 + st.texture;
-      if (st.readStreak >= 2 && inst.grand && enough && st.texture < TEXTURES.length - 1) {
-        st.texture++;
-        st.readStreak = 0;
-        st.tempo = Math.max(40, st.tempo - 6); // מרקם קשה יותר, טמפו נמוך יותר
-        const text = `מרקם חדש: ${TEXTURES[st.texture].name}`;
-        st.unlocked.push({ track: 'texture', kind: 'texture', text, d: Store.today() });
-        out.push({ track: 'texture', kind: 'texture', text });
+    let change = null;
+    if (st.readBack == null) st.readBack = 0;
+    if (score < 0.6) {
+      st.readStreak = 0;
+      st.readFails = (st.readFails || 0) + 1;
+      if (st.readBack < BACK_MAX) {
+        st.readBack++;
+        st.readFails = 0;
+        change = { dir: 'down', text: 'בקטע הבא: פחות תווים ומקצבים פשוטים יותר, באותו טמפו.' };
+      } else if (st.readFails >= 2 && st.tempo > TEMPO_MIN) {
+        st.tempo = Math.max(TEMPO_MIN, st.tempo - 4);
+        st.readFails = 0;
+        change = { dir: 'down', text: `החומר כבר בסיסי, אז הטמפו יורד מעט ל־${st.tempo}.` };
       }
-    } else st.readStreak = 0;
+    } else if (score >= 0.85) {
+      st.readFails = 0;
+      st.readStreak++;
+      if (st.tempo < TEMPO_FLOOR) {
+        st.tempo = Math.min(TEMPO_FLOOR, st.tempo + 4);
+        change = { dir: 'up', text: `הטמפו חוזר ל־${st.tempo}.` };
+      } else if (st.readBack > 0) {
+        st.readBack--;
+        st.readStreak = 0;
+        change = { dir: 'up', text: st.readBack ? 'בקטע הבא: עוד תווים ומקצבים חוזרים.' : 'בקטע הבא: כל התווים והמקצבים שפתחתם.' };
+      } else {
+        const enough = Math.min(...inst.clefs.map(c => st.pitch[c])) >= 4 + st.texture;
+        if (st.readStreak >= 2 && inst.grand && enough && st.texture < TEXTURES.length - 1) {
+          st.texture++;
+          st.readStreak = 0;
+          const text = `מרקם חדש: ${TEXTURES[st.texture].name}`;
+          st.unlocked.push({ track: 'texture', kind: 'texture', text, d: Store.today() });
+          out.push({ track: 'texture', kind: 'texture', text });
+        } else if (st.readStreak >= 2 && score >= 0.9) {
+          st.tempo = Math.min(160, st.tempo + 3);
+          st.readStreak = 0;
+          change = { dir: 'up', text: `קריאה נקייה פעמיים ברצף: הטמפו עולה ל־${st.tempo}.` };
+        }
+      }
+    } else { st.readStreak = 0; st.readFails = 0; }
+    out.change = change;
     return out;
+  }
+
+  // כמה מהחומר הפתוח נכנס לקטע הקריאה הבא
+  function readScope(st, inst) {
+    const back = st.readBack || 0;
+    const pitch = {};
+    inst.clefs.forEach(c => { pitch[c] = Math.max(0, st.pitch[c] - 2 * back); });
+    return {
+      back, pitch,
+      rhythm: Math.max(0, st.rhythm - back),
+      keys: Math.max(0, st.keys - Math.ceil(back / 2)),
+      texture: Math.max(0, (st.texture || 0) - Math.ceil(back / 2)),
+    };
   }
 
   // ---- הגדרות לקטע קריאה ----
   function readSettings(st, inst, overrides = {}) {
-    const tx = TEXTURES[st.texture];
+    const sc = readScope(st, inst);
+    const eff = { ...st, pitch: sc.pitch, rhythm: sc.rhythm, keys: sc.keys, texture: sc.texture };
+    const tx = TEXTURES[eff.texture];
     let staff;
     if (inst.grand && !inst.mono && tx.hands === 'both') staff = 'grand';
     else if (inst.grand || inst.mono) { st.lastHand = st.lastHand === 'L' ? 'R' : 'L'; staff = st.lastHand === 'R' ? 'treble' : 'bass'; }
     else staff = inst.clefs[0];
     const ranges = Levels.ranges(5);
-    inst.clefs.forEach(c => { const r = rangeAt(c, st.pitch[c]); ranges[c] = [r.lo, r.hi]; });
-    const refStage = Math.min(...inst.clefs.map(c => st.pitch[c]));
-    const time = pickTime(st);
+    inst.clefs.forEach(c => { const r = rangeAt(c, eff.pitch[c]); ranges[c] = [r.lo, r.hi]; });
+    const refStage = Math.min(...inst.clefs.map(c => eff.pitch[c]));
+    const time = pickTime(eff);
     const ti = Gen.timeInfo(time);
-    const cells = cellsFor(st, ti);
+    const cells = cellsFor(eff, ti);
     return {
-      level: st.texture >= 6 ? 7 : 3, staff, measures: st.rhythm + refStage >= 6 ? 8 : 4, times: [time], cells,
-      rhythm: Cells.keysOf(cells), keys: [pickKey(st)], mode: st.keys >= 3 ? 'both' : 'major',
+      level: eff.texture >= 6 ? 7 : 3, staff, measures: !sc.back && eff.rhythm + refStage >= 6 ? 8 : 4, times: [time], cells,
+      rhythm: Cells.keysOf(cells), keys: [pickKey(eff)], mode: eff.keys >= 3 ? 'both' : 'major',
       restProb: 0, sync: false, maxInt: MAX_INT[Math.min(refStage, MAX_INT.length - 1)],
-      accProb: st.keys >= 8 ? 0.1 : st.keys >= 4 ? 0.05 : 0,
+      accProb: sc.back ? 0 : eff.keys >= 8 ? 0.1 : eff.keys >= 4 ? 0.05 : 0,
       rhChord: inst.grand ? tx.rhChord : 0, rhMax: inst.grand ? tx.rhMax : 1, lhStyle: tx.lhStyle, lhMax: tx.lhMax,
-      density: 'mid', ranges, ...overrides,
+      density: sc.back >= 2 ? 'sparse' : 'mid', ranges, ...overrides,
     };
   }
   function pickTime(st) {
@@ -326,6 +380,6 @@ const Curriculum = (() => {
   return {
     INSTRUMENTS, CLEF_NAMES, START_POINTS, INPUTS, TRANSPOSERS, FAMILIES, intervalText, transposer, soundingText, TEXTURES, RHYTHM_STAGES, KEY_ORDER, CHORD_ORDER, BLOCK_INFO, TARGET, WINDOW,
     defaultStaff, totalNotes, totalCells, fresh, load, save, rangeAt, maxPitchStage, cellsAt, timesAt, keysAt, chordsAt, newestCells, cellsFor, cellWeight, weight,
-    push, acc, full, tryAdvance, afterRead, readSettings, pickTime, pickKey, noteWeights, placeText, plan,
+    push, acc, full, tryAdvance, afterRead, readScope, readSettings, TEMPO_FLOOR, BACK_MAX, pickTime, pickKey, noteWeights, placeText, plan,
   };
 })();

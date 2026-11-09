@@ -158,6 +158,8 @@ const Curriculum = (() => {
   const timesAt = st => RHYTHM_STAGES.slice(0, st.rhythm + 1).flatMap(s => s.times || []);
   const keysAt = st => KEY_ORDER.slice(0, st.keys + 1);
   const chordsAt = st => CHORD_ORDER.slice(0, st.chords + 1);
+  const totalNotes = clef => { const r = rangeAt(clef, maxPitchStage(clef)); return r.hi - r.lo + 1; };
+  const totalCells = () => RHYTHM_STAGES.reduce((a, s) => a + s.cells.length, 0);
   const newestCells = st => RHYTHM_STAGES[st.rhythm].cells;
 
   // משקל לפריט: חדש, חלש או שהגיע זמן חזרה עולים יותר; שלוט – פחות
@@ -223,7 +225,6 @@ const Curriculum = (() => {
     const out = [];
     if (score >= 0.9) st.tempo = Math.min(160, st.tempo + 4);
     if (score < 0.6) st.tempo = Math.max(40, st.tempo - 6);
-    st.mask = score >= 0.85;
     if (score >= 0.85) {
       st.readStreak++;
       const enough = Math.min(...inst.clefs.map(c => st.pitch[c])) >= 4 + st.texture;
@@ -324,7 +325,7 @@ const Curriculum = (() => {
 
   return {
     INSTRUMENTS, CLEF_NAMES, START_POINTS, INPUTS, TRANSPOSERS, FAMILIES, intervalText, transposer, soundingText, TEXTURES, RHYTHM_STAGES, KEY_ORDER, CHORD_ORDER, BLOCK_INFO, TARGET, WINDOW,
-    defaultStaff, fresh, load, save, rangeAt, maxPitchStage, cellsAt, timesAt, keysAt, chordsAt, newestCells, cellsFor, cellWeight, weight,
+    defaultStaff, totalNotes, totalCells, fresh, load, save, rangeAt, maxPitchStage, cellsAt, timesAt, keysAt, chordsAt, newestCells, cellsFor, cellWeight, weight,
     push, acc, full, tryAdvance, afterRead, readSettings, pickTime, pickKey, noteWeights, placeText, plan,
   };
 })();
